@@ -65,7 +65,7 @@ const Highlight: FunctionComponent<{ match?: Match }> = ({
 
 const Result: FunctionComponent<
   RawSearchresults[0] & {
-    path: string;
+    path: string[];
     icon: string;
     isHighlighted: boolean;
   }
@@ -85,33 +85,30 @@ const Result: FunctionComponent<
 };
 
 const SearchResults: FunctionComponent<{
+  inputValue: string;
   results: DownshiftItem[];
   getPath: (item: Item) => string[];
   getMenuProps: ControllerStateAndHelpers<DownshiftItem>["getMenuProps"];
   getItemProps: ControllerStateAndHelpers<DownshiftItem>["getItemProps"];
   highlightedIndex: number | null;
-  style: CSSObject;
 }> = ({
+  inputValue,
   results,
   getPath,
   getMenuProps,
   getItemProps,
-  highlightedIndex,
-  style
+  highlightedIndex
 }) => {
-  let offset = 0;
   return (
-    <ResultsList {...getMenuProps()} style={style}>
-      {results.map((result, idx) => {
-        if (typeof result === "string") {
-          offset += 1;
-          return (
-            <li key={offset}>
-              <GroupHeading>{result}</GroupHeading>
-            </li>
-          );
-        }
-        const index = idx - offset;
+    <ResultsList {...getMenuProps()}>
+      {results.length > 0 && (
+        <li>
+          <GroupHeading>
+            {inputValue ? "Results" : "Recently opened"}
+          </GroupHeading>
+        </li>
+      )}
+      {results.map((result, index) => {
         if (isExpandType(result)) {
           return (
             <ResultRow

@@ -94,6 +94,7 @@ const Sidebar: FunctionComponent<{ data: Record<string, Item> }> = ({
         }) => (
           <Swap condition={!!(inputHasFocus || inputValue)}>
             <SearchResults
+              inputValue={inputValue}
               results={results}
               getPath={getPath}
               getMenuProps={getMenuProps}

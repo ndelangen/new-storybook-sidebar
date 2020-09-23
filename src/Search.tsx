@@ -136,7 +136,7 @@ const Search: FunctionComponent<{
 }> = ({ children, data, lastViewed, initialQuery = "" }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState(initialQuery);
-  const [inputPlaceholder, setPlaceholder] = useState("Press / to search");
+  const [inputPlaceholder, setPlaceholder] = useState("Find components");
 
   useEffect(() => {
     const focusSearch = (event) => {
@@ -173,8 +173,8 @@ const Search: FunctionComponent<{
       );
 
       if (componentResults.length) {
-        results.push(...componentResults.slice(0, allComponents ? 100 : 5));
-        if (componentResults.length > 5 && !allComponents) {
+        results.push(...componentResults.slice(0, allComponents ? 100 : 10));
+        if (componentResults.length > 10 && !allComponents) {
           results.push({
             showAll: () => showAllComponents(true),
             totalCount: componentResults.length
@@ -237,14 +237,14 @@ const Search: FunctionComponent<{
           value: query,
           placeholder: inputPlaceholder,
           onChange: (e) => setQuery(e.target.value),
-          onFocus: () => setPlaceholder("Search components & stories"),
-          onBlur: () => setPlaceholder("Press / to search")
+          onFocus: () => setPlaceholder("Type to find..."),
+          onBlur: () => setPlaceholder("Find components")
         });
 
         return (
           <>
             <ScreenReaderLabel {...getLabelProps()}>
-              Search for a story or component
+              Search for components
             </ScreenReaderLabel>
             <SearchField
               {...getRootProps({ refKey: "" }, { suppressRefError: true })}
