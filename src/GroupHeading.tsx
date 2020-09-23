@@ -5,9 +5,10 @@ const GroupHeading = styled(Subheading)({
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  padding: "15px 23px 0 23px",
-  minHeight: 25,
-  fontSize: `${styles.typography.size.s1}px`,
+  margin: "15px 23px 5px 23px",
+  minHeight: 21,
+  lineHeight: "15px",
+  fontSize: `${styles.typography.size.s1 - 1}px`,
   color: styles.color.mediumdark
 });
 

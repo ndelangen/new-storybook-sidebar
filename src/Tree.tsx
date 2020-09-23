@@ -1,4 +1,4 @@
-import styled, { CSSObject } from "@emotion/styled";
+import styled from "@emotion/styled";
 import { Icon, styles } from "@storybook/design-system";
 import throttle from "lodash.throttle";
 import React, {
@@ -68,6 +68,7 @@ const ToggleAll = styled.button({
 
 const Node = React.memo<{
   node: Item;
+  isRooted: boolean;
   isExpanded: boolean;
   isAllExpanded: boolean;
   setExpanded: (i: { id: Item["id"]; value: boolean; all?: boolean }) => void;
@@ -77,6 +78,7 @@ const Node = React.memo<{
 }>(
   ({
     node,
+    isRooted,
     isExpanded,
     isAllExpanded,
     setExpanded,
@@ -93,7 +95,7 @@ const Node = React.memo<{
           data-id={node.id}
           data-parent={node.parent}
           data-highlightable={isDisplayed}
-          depth={node.depth}
+          depth={isRooted ? node.depth - 1 : node.depth}
           isHighlighted={isHighlighted}
           onClick={() => onSelectStory(node.id)}
         >
@@ -126,7 +128,7 @@ const Node = React.memo<{
         data-highlightable={isDisplayed}
         aria-controls={`collapsible__${node.id}`}
         aria-expanded={isExpanded}
-        depth={node.depth}
+        depth={isRooted ? node.depth - 1 : node.depth}
         isComponent={node.isComponent}
         isExpandable={node.children && node.children.length > 0}
         isExpanded={isExpanded}
@@ -139,16 +141,15 @@ const Node = React.memo<{
   }
 );
 
-const Roots = styled.div<{ hasOthers: boolean }>((props) => ({
-  marginTop: props.hasOthers ? 20 : 0,
-  marginBottom: 22
+const Root = styled.div<{ hasOrphans: boolean }>((props) => ({
+  marginTop: props.hasOrphans ? 20 : 0,
+  marginBottom: 20
 }));
 
 const Tree = React.memo<{
   data: Record<string, Item>;
   onSelectStory: (id: string) => void;
-  style: CSSObject;
-}>(({ data, onSelectStory, style }) => {
+}>(({ data, onSelectStory }) => {
   const nodeIds = useMemo(() => Object.keys(data), [data]);
   const [roots, orphans] = useMemo(
     () =>
@@ -163,7 +164,7 @@ const Tree = React.memo<{
       ),
     [data, nodeIds]
   );
-  const othersFirst = useMemo(
+  const orphansFirst = useMemo(
     () =>
       nodeIds
         .reduce<[string[], string[]]>(
@@ -200,81 +201,96 @@ const Tree = React.memo<{
     )
   );
 
-  const rootRef = useRef<HTMLElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
+    const getElementByDataId = (id: string) =>
+      rootRef.current && rootRef.current.querySelector(`[data-id=${id}]`);
+
+    const highlightElement = (element) => {
+      setHighlighted(element.getAttribute("data-id"));
+      const { top, bottom } = element.getBoundingClientRect();
+      const inView =
+        top >= 0 &&
+        bottom <= (window.innerHeight || document.documentElement.clientHeight);
+      if (!inView) element.scrollIntoView({ block: "nearest" });
+    };
+
     const navigateTree = throttle((event: KeyboardEvent) => {
       if (!rootRef || !rootRef.current) return;
 
-      const getElementByDataId = (id: string) =>
-        id && rootRef.current.querySelector(`[data-id=${id}]`);
-      const highlightElement = (element) => {
-        event.preventDefault();
-        setHighlighted(element.getAttribute("data-id"));
-        const { top, bottom } = element.getBoundingClientRect();
-        const inView =
-          top >= 0 &&
-          bottom <=
-            (window.innerHeight || document.documentElement.clientHeight);
-        if (!inView) element.scrollIntoView({ block: "nearest" });
-      };
+      switch (event.key) {
+        case "ArrowUp":
+        case "ArrowDown": {
+          event.preventDefault();
+          const focusable = Array.from(
+            rootRef.current.querySelectorAll("[data-highlightable=true]")
+          );
+          const focusedIndex = focusable.findIndex(
+            (el) => el.getAttribute("data-id") === highlighted
+          );
+          highlightElement(
+            cycleArray(
+              focusable,
+              focusedIndex,
+              event.key === "ArrowUp" ? -1 : 1
+            )
+          );
+          break;
+        }
 
-      if (event.key === "ArrowUp" || event.key === "ArrowDown") {
-        event.preventDefault();
-        const focusable = [
-          ...rootRef.current.querySelectorAll("[data-highlightable=true]")
-        ];
-        const focusedIndex = focusable.findIndex(
-          (el) => el.getAttribute("data-id") === highlighted
-        );
-        highlightElement(
-          cycleArray(focusable, focusedIndex, event.key === "ArrowUp" ? -1 : 1)
-        );
-      }
-
-      if (event.key === "ArrowLeft" && highlighted) {
-        const highlightedElement = getElementByDataId(highlighted);
-        const expanded = highlightedElement.getAttribute("aria-expanded");
-        if (expanded === "true") {
-          setExpanded({ id: highlighted, value: false });
-        } else {
-          const parentId = highlightedElement.getAttribute("data-parent");
-          const parentElement = getElementByDataId(parentId);
-          if (
-            parentElement &&
-            parentElement.getAttribute("data-highlightable") === "true"
-          ) {
-            setExpanded({ id: parentId, value: false });
-            highlightElement(parentElement);
+        case "ArrowLeft": {
+          event.preventDefault();
+          if (!highlighted) break;
+          const highlightedElement = getElementByDataId(highlighted);
+          if (!highlightedElement) break;
+          const expanded = highlightedElement.getAttribute("aria-expanded");
+          if (expanded === "true") {
+            setExpanded({ id: highlighted, value: false });
           } else {
-            setExpanded({ id: parentId, value: false, all: true });
+            const parentId = highlightedElement.getAttribute("data-parent");
+            if (!parentId) break;
+            const parentElement = getElementByDataId(parentId);
+            if (
+              parentElement &&
+              parentElement.getAttribute("data-highlightable") === "true"
+            ) {
+              setExpanded({ id: parentId, value: false });
+              highlightElement(parentElement);
+            } else {
+              setExpanded({ id: parentId, value: false, all: true });
+            }
+          }
+          break;
+        }
+
+        case "ArrowRight": {
+          event.preventDefault();
+          if (!highlighted) break;
+          const highlightedElement = getElementByDataId(highlighted);
+          if (!highlightedElement) break;
+          const expanded = highlightedElement.getAttribute("aria-expanded");
+          if (expanded === "false") {
+            setExpanded({ id: highlighted, value: true });
+          } else if (expanded === "true") {
+            setExpanded({ id: highlighted, value: true, all: true });
           }
         }
       }
-
-      if (event.key === "ArrowRight" && highlighted) {
-        const highlightedElement = getElementByDataId(highlighted);
-        const expanded = highlightedElement.getAttribute("aria-expanded");
-        if (expanded === "false") {
-          event.preventDefault();
-          setExpanded({ id: highlighted, value: true });
-        } else if (expanded === "true") {
-          event.preventDefault();
-          setExpanded({ id: highlighted, value: true, all: true });
-        }
-      }
     }, 16);
+
     document.addEventListener("keydown", navigateTree);
     return () => document.removeEventListener("keydown", navigateTree);
   }, [highlighted, setHighlighted]);
 
   return (
-    <Roots hasOthers={orphans.length > 0} ref={rootRef} style={style}>
-      {othersFirst.map((id) => {
+    <Root ref={rootRef} hasOrphans={orphans.length > 0}>
+      {orphansFirst.map((id) => {
         const node = data[id];
         return (
           <Node
             key={id}
             node={node}
+            isRooted={!orphans.includes(id)}
             isExpanded={!!expanded[id]}
             isAllExpanded={
               node.isRoot &&
@@ -290,7 +306,7 @@ const Tree = React.memo<{
           />
         );
       })}
-    </Roots>
+    </Root>
   );
 });
 
